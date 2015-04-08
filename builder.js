@@ -1,5 +1,6 @@
 
 var fs = require('fs');
+var path = require('path');
 var assert = require('assert');
 var FormData = require('form-data');
 var stringify = require('json-stable-stringify');
@@ -15,6 +16,8 @@ var CONSTANTS = require('./constants');
  * to enable uniqueness per given content, and validation
  */
 function Builder() {
+  if (!(this instanceof Builder)) return new Builder();
+
   this._data = null;
   this._attachments = [];
 }
@@ -47,7 +50,7 @@ Builder.prototype.attach = function(name, value) {
 
   this._attachments.push({
     name: name,
-    value: value,
+    value: path.resolve(value),
     isFile: true
   });
 

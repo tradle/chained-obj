@@ -12,6 +12,8 @@ var assert = require('assert');
 var CONSTANTS = require('./constants');
 
 function Parser() {
+  if (!(this instanceof Parser)) return new Parser();
+
   this._attachments = [];
 }
 
