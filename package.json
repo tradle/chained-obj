@@ -1,5 +1,5 @@
 {
-  "name": "tradle-form",
+  "name": "chained-obj",
   "version": "0.0.1",
   "description": "create multipart on-chain objects",
   "main": "index.js",
