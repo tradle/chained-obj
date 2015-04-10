@@ -2,8 +2,9 @@
 var fs = require('fs');
 var path = require('path');
 var assert = require('assert');
+var bufIndexOf = require('buffer-indexof')
 var FormData = require('form-data');
-var stringify = require('json-stable-stringify');
+var stringify = require('tradle-utils').stringify;
 var concat = require('concat-stream');
 var crypto = require('crypto');
 var once = require('once');
@@ -24,11 +25,18 @@ function Builder() {
 
 /**
  * specify main data object
- * @param  {String|Object} json
+ * @param  {String|Buffer|Object} json
  * @return {Builder} this Builder
  */
 Builder.prototype.data = function(json) {
-  json = typeof json === 'string' ? json : stringify(json);
+  if (typeof json === 'object') {
+    if (Buffer.isBuffer(json)) json = JSON.parse(json);
+
+    json = stringify(json);
+  }
+
+  if (typeof json === 'string') json = new Buffer(json, 'binary');
+
   this._data = {
     name: CONSTANTS.DATA_ARG_NAME,
     value: json
@@ -54,6 +62,7 @@ Builder.prototype.attach = function(name, value) {
     isFile: true
   });
 
+  this._sorted = false;
   return this;
 }
 
@@ -97,8 +106,23 @@ Builder.prototype.partial = function(cb) {
   if (!this._checkReady(cb)) return;
 }
 
+Builder.prototype._sort = function() {
+  if (this._sorted) return;
+
+  this._attachments.sort(function(a, b) {
+    // alphabetical
+    a = path.basename(a.name).toLowerCase();
+    b = path.basename(b.name).toLowerCase();
+    return a < b ? -1 : a === b ? 0 : 1;
+  });
+
+  this._sorted = true;
+}
+
 Builder.prototype.hash = function(cb) {
   var self = this;
+
+  this._sort();
 
   var combinedStream = CombinedStream.create();
   for (var i = 0; i < this._attachments.length; i++) {
@@ -107,7 +131,7 @@ Builder.prototype.hash = function(cb) {
   }
 
   combinedStream.pipe(concat(function(buf) {
-    buf = Buffer.concat([new Buffer(self._data.value), buf]);
+    buf = Buffer.concat([self._data.value, buf]);
     cb(null, getHash(buf));
   }));
 
@@ -152,7 +176,18 @@ function toForm(options, cb) {
 // }
 
 function getHash(data) {
-  return crypto.createHash('sha256').update(data).digest('hex');
+  // if hash is contained in file, hash the hash till it isn't
+  var idx;
+  var hash;
+  do {
+    if (hash) console.log('Miracle, file with its own hash:', data, hash);
+
+    hash = crypto.createHash('sha256').update(hash || data).digest('hex').slice(0, 50);
+    idx = bufIndexOf(data, hash);
+  }
+  while (idx !== -1);
+
+  return hash;
 }
 
 
