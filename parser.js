@@ -7,6 +7,7 @@ var bufferEqual = require('buffer-equal');
 var buf2stream = require('simple-bufferstream');
 var concat = require('concat-stream');
 var once = require('once');
+var isStream = require('isstream');
 var dezalgo = require('dezalgo');
 var assert = require('assert');
 var CONSTANTS = require('./constants');
@@ -25,7 +26,7 @@ function Parser() {
 Parser.prototype.parse = function(form, cb) {
   var self = this;
 
-  assert(typeof form === 'string' || Buffer.isBuffer(form));
+  assert(typeof form === 'string' || Buffer.isBuffer(form) || isStream(form));
 
   firstLine(form, function(line) {
     if (line.slice(0, 2) === '--') {
@@ -52,9 +53,6 @@ Parser.prototype.parse = function(form, cb) {
  */
 Parser.prototype._parse = function(form, cb) {
   var self = this;
-
-  form = typeof form === 'string' ? new Buffer(form, 'binary') : form;
-
   var attachments = this._attachments;
   var error;
   var togo = 0;
@@ -75,7 +73,7 @@ Parser.prototype._parse = function(form, cb) {
     headers: headers
   });
 
-  buf2stream(form).pipe(req);
+  toStream(form).pipe(req);
 
   incoming.parse(req, function(err, fields, files) {
     if (err) return cb(err);
@@ -125,6 +123,10 @@ Parser.prototype._validate = function(cb) {
   })
 }
 
+Parser.parse = function(buf, cb) {
+  return new Parser().parse(buf, cb);
+}
+
 function firstLine(buf, cb) {
   cb = once(dezalgo(cb));
   if (typeof buf === 'string') return cb(buf.slice(0, buf.indexOf(FormData.LINE_BREAK)));
@@ -147,6 +149,14 @@ function firstLine(buf, cb) {
   stream.on('end', function() {
     cb(line);
   });
+}
+
+function toStream(data) {
+  if (typeof data === 'string') data = new Buffer(data, 'binary');
+  if (Buffer.isBuffer(data)) data = buf2stream(data);
+  if (!isStream(data)) throw new Error('invalid format, provide string, Buffer or Stream');
+
+  return data;
 }
 
 module.exports = Parser;
