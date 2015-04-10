@@ -3,7 +3,7 @@ var test = require('tape');
 var Builder = require('../builder');
 var Parser = require('../parser');
 var fs = require('fs');
-var IMG_PATH = '/Users/tenaciousmv/Code/craigslist-app/src/app/images/icon.png';
+var IMG_PATH = './test/logo.png';
 var bufferEqual = require('buffer-equal');
 var streamEqual = require('stream-equal');
 var concat = require('concat-stream');
@@ -26,8 +26,7 @@ test('build single-part, parse', function(t) {
   function parse(err, buf) {
     if (err) throw err;
 
-    var p = new Parser();
-    p.parse(buf, function(err, parsed) {
+    Parser.parse(buf, function(err, parsed) {
       if (err) throw err;
 
       t.deepEqual(JSON.parse(parsed.data.value), data);
@@ -59,11 +58,8 @@ test('build multipart, parse', function(t) {
   function parse(err, buf) {
     if (err) throw err;
 
-    var p = new Parser();
-    p.parse(buf.toString('binary'), onParsed);
-
-    p = new Parser();
-    p.parse(buf, onParsed);
+    Parser.parse(buf.toString('binary'), onParsed);
+    Parser.parse(buf, onParsed);
   }
 
   function onParsed(err, parsed) {
@@ -80,6 +76,40 @@ test('build multipart, parse', function(t) {
   }
 });
 
+test('deterministically sort attachments', function(t) {
+  t.plan(1);
+
+  var attachments = [{
+    name: 'a',
+    value: IMG_PATH
+  }, {
+    name: 'b',
+    value: IMG_PATH
+  }, {
+    name: 'c',
+    value: IMG_PATH
+  }];
+
+  function build(att, cb) {
+    var b = new Builder();
+    var data = {
+      blah: 1
+    };
+
+    b.data(data);
+    attachments.forEach(function(att) {
+      b.attach(att.name, att.value)
+    })
+
+    b.build(cb);
+  }
+
+  build(attachments, function(err, buf) {
+    build(attachments.reverse(), function(err, rev) {
+      t.ok(bufferEqual(buf, rev));
+    });
+  });
+});
 // function imageStream() {
 //   return fs.createReadStream('/Users/tenaciousmv/Pictures/yy antelope.jpg');
 // };
