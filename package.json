@@ -26,19 +26,21 @@
     "array-find": "^0.1.1",
     "buffer-equal": "0.0.1",
     "buffer-indexof": "0.0.2",
-    "combined-stream": "0.0.7",
     "concat-stream": "^1.4.8",
     "dezalgo": "^1.0.1",
     "form-data": "^0.2.0",
     "formidable": "^1.0.17",
     "isstream": "^0.1.2",
-    "json-stable-stringify": "^1.0.0",
+    "mime-types": "^2.0.10",
     "mock-req": "^0.2.0",
     "once": "^1.3.1",
     "simple-bufferstream": "^1.0.0",
-    "tradle-utils": "git://github.com/tradle/tradle-utils"
+    "tradle-utils": "git://github.com/tradle/tradle-utils",
+    "typeforce": "^1.0.0"
   },
   "devDependencies": {
+    "midentity": "git://github.com/mvayngrib/identity#dev",
+    "object.omit": "^1.1.0",
     "stream-equal": "^0.1.5"
   }
 }

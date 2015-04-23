@@ -1,14 +1,15 @@
 
 var fs = require('fs');
 var path = require('path');
-var assert = require('assert');
+var mime = require('mime-types');
+var typeforce = require('typeforce');
 var bufIndexOf = require('buffer-indexof')
 var FormData = require('form-data');
 var stringify = require('tradle-utils').stringify;
 var concat = require('concat-stream');
 var crypto = require('crypto');
 var once = require('once');
-var CombinedStream = require('combined-stream');
+// var CombinedStream = require('combined-stream');
 var dezalgo = require('dezalgo');
 var CONSTANTS = require('./constants');
 
@@ -47,22 +48,34 @@ Builder.prototype.data = function(json) {
 
 /**
  * add an attachment
- * @param  {String} name
- * @param  {String|Buffer|Stream} value - see npm module form-data FormData.prototype.append for value constraints
+ * @param  {Object} options
+ * @param  {String} options.name - attachment name
+ * @param  {String} options.path - attachment file path
  * @return {Builder} this Builder
  */
-Builder.prototype.attach = function(name, value) {
+Builder.prototype.attach = function(options) {
   var self = this;
 
-  assert(typeof value === 'string', 'value must be a path');
+  typeforce({
+    path: 'String',
+    name: 'String'
+  }, options)
 
   this._attachments.push({
-    name: name,
-    value: path.resolve(value),
+    name: options.name,
+    path: path.resolve(options.path),
     isFile: true
   });
 
-  this._sorted = false;
+  return this;
+}
+
+/**
+ * @param  {Object|Function} signer - function that signs a Buffer, or an object with a sign function
+ * @return {Builder} this Builder
+ */
+Builder.prototype.signWith = function(signer) {
+  this._signer = signer;
   return this;
 }
 
@@ -70,13 +83,8 @@ Builder.prototype.attach = function(name, value) {
  * build the form to a buffer
  * @param  {Function} cb
  */
-Builder.prototype.build = function(partial, cb) {
+Builder.prototype.build = function(cb) {
   var self = this;
-
-  if (typeof partial === 'function') {
-    cb = partial;
-    partial = false;
-  }
 
   cb = dezalgo(cb);
   if (!this._checkReady(cb)) return;
@@ -88,10 +96,25 @@ Builder.prototype.build = function(partial, cb) {
   this.hash(function(err, hash) {
     if (err) return cb(err);
 
+    if (self._signer) {
+      var sig;
+      if (self._signer.sign) {
+        sig = self._signer.sign(hash);
+      }
+      else {
+        sig = self._signer(sig);
+      }
+
+      delete self._signer;
+      var json = JSON.parse(self._data.value);
+      json._sig = sig;
+      self.data(json);
+      return self.build(cb);
+    }
+
     toForm({
       parts: [self._data].concat(self._attachments),
-      boundary: hash,
-      partial: partial
+      boundary: hash
     }, cb);
   });
 }
@@ -101,50 +124,72 @@ Builder.prototype._checkReady = function(cb) {
   else return true;
 }
 
-Builder.prototype.partial = function(cb) {
-  cb = dezalgo(cb);
-  if (!this._checkReady(cb)) return;
+Builder.prototype._sort = function() {
+  this._attachments.sort(function(a, b) {
+    // alphabetical by hash of content
+    a = a.hash;
+    b = b.hash;
+    if (a === b) throw new Error('duplicate attachment found');
+
+    return a < b ? -1 : 1;
+  });
 }
 
-Builder.prototype._sort = function() {
-  if (this._sorted) return;
+Builder.prototype._readAttachments = function(cb) {
+  cb = once(cb);
 
-  this._attachments.sort(function(a, b) {
-    // alphabetical
-    a = path.basename(a.name).toLowerCase();
-    b = path.basename(b.name).toLowerCase();
-    return a < b ? -1 : a === b ? 0 : 1;
-  });
+  var togo = this._attachments.length + 1;
+  this._attachments.forEach(function(a) {
+    if (a.value) return finish();
 
-  this._sorted = true;
+    fs.createReadStream(a.path)
+      .on('error', cb)
+      .pipe(concat(function(buf) {
+        a.value = buf;
+        finish();
+      }))
+  })
+
+  finish();
+
+  function finish() {
+    if (--togo === 0) cb()
+  }
+}
+
+Builder.prototype._hashAndSort = function() {
+  this._attachments.forEach(function(a) {
+    if (!a.hash) a.hash = getHash(a.value);
+  })
+
+  this._sort();
 }
 
 Builder.prototype.hash = function(cb) {
   var self = this;
 
-  this._sort();
+  this._readAttachments(function(err) {
+    if (err) return cb(err);
 
-  var combinedStream = CombinedStream.create();
-  for (var i = 0; i < this._attachments.length; i++) {
-    var fPath = this._attachments[i].value;
-    combinedStream.append(fs.createReadStream(fPath));
-  }
+    self._hashAndSort();
+    var hashes = self._attachments.map(function(a) {
+      return a.hash;
+    })
 
-  combinedStream.pipe(concat(function(buf) {
-    buf = Buffer.concat([self._data.value, buf]);
-    cb(null, getHash(buf));
-  }));
+    hashes.unshift(getHash(self._data.value));
+    cb(null, getHash(hashes.join('')));
+  })
 
-  // toForm({
-  //   attachments: this._attachments,
-  //   boundary: CONSTANTS.DEFAULT_BOUNDARY
-  // }, function(err, buf) {
-  //   if (err) return cb(err);
+  // var combinedStream = CombinedStream.create();
+  // for (var i = 0; i < this._attachments.length; i++) {
+  //   var fPath = this._attachments[i].value;
+  //   combinedStream.append(fs.createReadStream(fPath));
+  // }
 
-  //   var hash = getHash(buf);
-  //   console.log('hash', hash);
-  //   cb(null, hash);
-  // });
+  // combinedStream.pipe(concat(function(buf) {
+  //   buf = Buffer.concat([self._data.value, buf]);
+  //   cb(null, getHash(buf));
+  // }));
 }
 
 function toForm(options, cb) {
@@ -155,25 +200,22 @@ function toForm(options, cb) {
   // override boundary
   form._boundary = options.boundary || CONSTANTS.DEFAULT_BOUNDARY;
   options.parts.forEach(function(part) {
-    var val = part.isFile ? fs.createReadStream(part.value) : part.value;
-    form.append(part.name, val);
+    // var val = part.isFile ? fs.createReadStream(part.value) : part.value;
+    var opts = {};
+    if (part.isFile) {
+      opts.contentType = mime.lookup(part.path)
+      opts.filename = part.hash;
+    }
+
+    form.append(part.name, part.value, opts);
   });
 
   form.on('error', cb);
 
   form.pipe(concat({ encoding: 'buffer' }, function(buf) {
-    // if (options.partial) {
-    //   var top = new Buffer(scalp(boundary));
-    //   buf = buf.slice(top.length);
-    // }
-
     cb(null, buf);
   }));
 }
-
-// function scalp(boundary) {
-//   return [boundary, CONSTANTS.JSON_CONTENT_DISP, form].join(FormData.LINE_BREAK);
-// }
 
 function getHash(data) {
   // if hash is contained in file, hash the hash till it isn't

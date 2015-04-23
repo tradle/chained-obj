@@ -1,6 +1,5 @@
 
 var formidable = require('formidable');
-var Builder = require('./builder');
 var MockReq = require('mock-req');
 var FormData = require('form-data');
 var bufferEqual = require('buffer-equal');
@@ -10,7 +9,10 @@ var once = require('once');
 var isStream = require('isstream');
 var dezalgo = require('dezalgo');
 var assert = require('assert');
+var omit = require('object.omit');
 var CONSTANTS = require('./constants');
+var Builder = require('./builder');
+var stringify = require('tradle-utils').stringify;
 
 function Parser() {
   if (!(this instanceof Parser)) return new Parser();
@@ -22,6 +24,7 @@ function Parser() {
  * Parse data and attachments from form
  * @param  {String|Buffer} form
  * @param  {Function} cb
+ * @return {Parser} this Parser instance
  */
 Parser.prototype.parse = function(form, cb) {
   var self = this;
@@ -38,12 +41,28 @@ Parser.prototype.parse = function(form, cb) {
       // one part
       self._data = {
         name: CONSTANTS.DATA_ARG_NAME,
-        value: form.toString()
+        value: JSON.parse(form.toString())
       }
 
-      cb(null, self._result());
+      self._validate(function(err) {
+        if (err) return cb(err)
+        else cb(null, self._result());
+      })
     }
   });
+
+  return this;
+}
+
+/**
+ * Verify signature
+ * @param  {Object|Function} verifier - verify function, or object with verify function
+ * @return {Parser} this Parser instance
+ */
+Parser.prototype.verifyWith = function(verifier, sig) {
+  this._verifier = verifier;
+  this._sig = sig;
+  return this;
 }
 
 /**
@@ -90,13 +109,13 @@ Parser.prototype._parse = function(form, cb) {
     if (!self._data) {
       self._data = {
         name: key,
-        value: val
+        value: JSON.parse(val)
       }
     }
     else {
       attachments.push({
         name: key,
-        value: val.path
+        path: val.path
       });
     }
   }
@@ -111,13 +130,32 @@ Parser.prototype._result = function() {
 
 Parser.prototype._validate = function(cb) {
   var self = this;
+  var data = this._data.value;
+  var unsigned;
+  var sig;
+  if (this._verifier) {
+    if (!data._sig) return cb(new Error('object is not signed, can\'t verify'));
+
+    sig = data._sig;
+    unsigned = omit(data, '_sig');
+  }
+
   var b = new Builder();
-  b.data(this._data.value);
-  this._attachments.forEach(function(att) {
-    b.attach(att.name, att.value);
-  });
+  b.data(unsigned || data);
+  this._attachments.forEach(b.attach, b);
 
   b.hash(function(err, hash) {
+    if (sig && self._verifier) {
+      var verified;
+      if (typeof this._verifier === 'function') verified = self._verifier(hash, sig);
+      else verified = self._verifier.verify(hash, sig);
+
+      if (!verified) return cb(new Error('invalid signature'));
+
+      delete self._verifier;
+      return self._validate(cb);
+    }
+
     if (err) return cb(err);
     cb(null, hash === self._boundary);
   })

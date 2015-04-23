@@ -1,12 +1,22 @@
 
-var test = require('tape');
-var Builder = require('../builder');
-var Parser = require('../parser');
 var fs = require('fs');
-var IMG_PATH = './test/logo.png';
+var test = require('tape');
+var path = require('path');
 var bufferEqual = require('buffer-equal');
 var streamEqual = require('stream-equal');
 var concat = require('concat-stream');
+var omit = require('object.omit');
+
+var mi = require('midentity');
+var Identity = mi.Identity;
+var Keys = mi.Keys;
+var Builder = require('../builder');
+var Parser = require('../parser');
+var imgs = [
+  './test/logo.png',
+  './test/logo1.png',
+  './test/logo2.png'
+]
 
 test('build single-part, parse', function(t) {
   t.plan(6);
@@ -29,7 +39,7 @@ test('build single-part, parse', function(t) {
     Parser.parse(buf, function(err, parsed) {
       if (err) throw err;
 
-      t.deepEqual(JSON.parse(parsed.data.value), data);
+      t.deepEqual(parsed.data.value, data);
       t.deepEqual(parsed.attachments, []);
     });
   }
@@ -45,14 +55,11 @@ test('build multipart, parse', function(t) {
 
   var attachments = [{
     name: 'yy',
-    value: IMG_PATH
+    path: imgs[0]
   }];
 
   b.data(data);
-  attachments.forEach(function(att) {
-    b.attach(att.name, att.value)
-  })
-
+  attachments.forEach(b.attach, b);
   b.build(parse);
 
   function parse(err, buf) {
@@ -65,10 +72,10 @@ test('build multipart, parse', function(t) {
   function onParsed(err, parsed) {
     if (err) throw err;
 
-    t.deepEqual(JSON.parse(parsed.data.value), data);
+    t.deepEqual(parsed.data.value, data);
     parsed.attachments.forEach(function(rAtt, i) {
-      var a = fs.createReadStream(rAtt.value);
-      var b = fs.createReadStream(attachments[i].value);
+      var a = fs.createReadStream(rAtt.path);
+      var b = fs.createReadStream(attachments[i].path);
       streamEqual(a, b, function(err, equal) {
         t.equal(equal, true);
       });
@@ -81,13 +88,13 @@ test('deterministically sort attachments', function(t) {
 
   var attachments = [{
     name: 'a',
-    value: IMG_PATH
+    path: imgs[0]
   }, {
     name: 'b',
-    value: IMG_PATH
+    path: imgs[1]
   }, {
     name: 'c',
-    value: IMG_PATH
+    path: imgs[2]
   }];
 
   function build(att, cb) {
@@ -97,10 +104,7 @@ test('deterministically sort attachments', function(t) {
     };
 
     b.data(data);
-    attachments.forEach(function(att) {
-      b.attach(att.name, att.value)
-    })
-
+    attachments.forEach(b.attach, b);
     b.build(cb);
   }
 
@@ -110,65 +114,35 @@ test('deterministically sort attachments', function(t) {
     });
   });
 });
-// function imageStream() {
-//   return fs.createReadStream('/Users/tenaciousmv/Pictures/yy antelope.jpg');
-// };
 
-// var form = buildForm();
-// form.getLength(function(err, length) {
-//   var headers = form.getHeaders();
-//   headers['Content-Length'] = length;
-//   var req = new MockReq({
-//     method: 'POST',
-//     headers: headers
-//   });
+test('sign, hash, build, parse, verify', function(t) {
+  var attachments = imgs.map(function(iPath) {
+    return {
+      name: path.basename(iPath, path.extname(iPath)),
+      path: iPath
+    }
+  });
 
-//   form.pipe(req);
-//   incoming.parse(req, function(err, fields, files) {
-//     console.log('Received, parsed', arguments);
-//   });
-// });
+  var key = Keys.EC.gen({
+    purpose: 'sign'
+  });
 
-// function fromPartial(form) {
-//   var boundary = guessBoundary(form);
+  var b = new Builder();
+  var data = {
+    blah: 1
+  };
 
-//   if (!boundary) throw new Error('no multipart boundary found');
+  b.data(data);
+  attachments.forEach(b.attach, b);
+  b.signWith(key);
+  b.build(function(err, buf) {
+    if (err) throw err;
 
-//   if (form.slice(0, boundary.length) === boundary) return form;
+    Parser.parse(buf, function(err, parsed) {
+      if (err) throw err;
 
-//   return [boundary, JSON_CONTENT_DISP, form].join(FormData.LINE_BREAK);
-// }
-
-// function guessBoundary(form) {
-//   return find(form.split(FormData.LINE_BREAK), function(part) {
-//     return /----/.test(part);
-//   });
-// }
-
-// function generateBoundary(parts) {
-//   var all = parts.sort().join('');
-//   crypto.createHash('sha256').update(all).digest('hex');
-// }
-
-// function partialForm(cb) {
-//   buildForm().pipe(concat(function(buf) {
-//     var str = buf.toString();
-//     var idx = str.indexOf('\n', str.indexOf('\n') + 1);
-//     cb(str.slice(idx + 1));
-//   }));
-// }
-
-// // test build/recover partial form
-// partialForm(function(partial) {
-//   var recovered = fromPartial(partial);
-//   buildForm().pipe(concat(function(buf) {
-//     var full = buf.toString();
-//     // var d = diff.diffWordsWithSpace(full, recovered);
-//     // d.forEach(function(part) {
-//     //   console.log(part);
-//     // });
-//     fs.writeFile('./test/full.form', full);
-//     fs.writeFile('./test/recovered.form', recovered);
-//     console.log(recovered === full);
-//   }));
-// });
+      t.end();
+    })
+    .verifyWith(key);
+  });
+})
