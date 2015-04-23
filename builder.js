@@ -9,7 +9,7 @@ var stringify = require('tradle-utils').stringify;
 var concat = require('concat-stream');
 var crypto = require('crypto');
 var once = require('once');
-// var CombinedStream = require('combined-stream');
+var find = require('array-find');
 var dezalgo = require('dezalgo');
 var CONSTANTS = require('./constants');
 
@@ -43,6 +43,7 @@ Builder.prototype.data = function(json) {
     value: json
   };
 
+  this._hashed = false;
   return this;
 }
 
@@ -61,12 +62,15 @@ Builder.prototype.attach = function(options) {
     name: 'String'
   }, options)
 
+  if (this._getAttachment(options.name)) throw new Error('duplicate attachment');
+
   this._attachments.push({
     name: options.name,
     path: path.resolve(options.path),
     isFile: true
   });
 
+  this._hashed = false;
   return this;
 }
 
@@ -119,20 +123,28 @@ Builder.prototype.build = function(cb) {
   });
 }
 
+Builder.prototype._getAttachment = function(name) {
+  return find(this._attachments, function(a) {
+    return a.name === name;
+  });
+}
+
+Builder.prototype.getAttachmentHash = function(name, cb) {
+  var self = this;
+
+  this.hash(function(err) {
+    if (err) return cb(err);
+
+    var att = self._getAttachment(name);
+    if (!att) return cb(new Error('attachment not found'));
+
+    return cb(null, att.hash);
+  })
+}
+
 Builder.prototype._checkReady = function(cb) {
   if (this._data == null) cb(new Error('"data" is required'));
   else return true;
-}
-
-Builder.prototype._sort = function() {
-  this._attachments.sort(function(a, b) {
-    // alphabetical by hash of content
-    a = a.hash;
-    b = b.hash;
-    if (a === b) throw new Error('duplicate attachment found');
-
-    return a < b ? -1 : 1;
-  });
 }
 
 Builder.prototype._readAttachments = function(cb) {
@@ -158,11 +170,22 @@ Builder.prototype._readAttachments = function(cb) {
 }
 
 Builder.prototype._hashAndSort = function() {
+  if (this._hashed) return;
+
   this._attachments.forEach(function(a) {
     if (!a.hash) a.hash = getHash(a.value);
   })
 
-  this._sort();
+  this._attachments.sort(function(a, b) {
+    // alphabetical by hash of content
+    a = a.hash;
+    b = b.hash;
+    if (a === b) throw new Error('duplicate attachment found');
+
+    return a < b ? -1 : 1;
+  });
+
+  this._hashed = true;
 }
 
 Builder.prototype.hash = function(cb) {
@@ -171,25 +194,19 @@ Builder.prototype.hash = function(cb) {
   this._readAttachments(function(err) {
     if (err) return cb(err);
 
-    self._hashAndSort();
+    try {
+      self._hashAndSort();
+    } catch(err) {
+      return cb(err);
+    }
+
     var hashes = self._attachments.map(function(a) {
       return a.hash;
     })
 
     hashes.unshift(getHash(self._data.value));
     cb(null, getHash(hashes.join('')));
-  })
-
-  // var combinedStream = CombinedStream.create();
-  // for (var i = 0; i < this._attachments.length; i++) {
-  //   var fPath = this._attachments[i].value;
-  //   combinedStream.append(fs.createReadStream(fPath));
-  // }
-
-  // combinedStream.pipe(concat(function(buf) {
-  //   buf = Buffer.concat([self._data.value, buf]);
-  //   cb(null, getHash(buf));
-  // }));
+  });
 }
 
 function toForm(options, cb) {
@@ -231,6 +248,5 @@ function getHash(data) {
 
   return hash;
 }
-
 
 module.exports = Builder;
