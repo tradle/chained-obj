@@ -59,9 +59,8 @@ Parser.prototype.parse = function(form, cb) {
  * @param  {Object|Function} verifier - verify function, or object with verify function
  * @return {Parser} this Parser instance
  */
-Parser.prototype.verifyWith = function(verifier, sig) {
+Parser.prototype.verifyWith = function(verifier) {
   this._verifier = verifier;
-  this._sig = sig;
   return this;
 }
 
