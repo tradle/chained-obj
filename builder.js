@@ -93,10 +93,6 @@ Builder.prototype.build = function(cb) {
   cb = dezalgo(cb);
   if (!this._checkReady(cb)) return;
 
-  if (!this._attachments.length) {
-    return cb(null, self._data.value);
-  }
-
   this.hash(function(err, hash) {
     if (err) return cb(err);
 
@@ -114,6 +110,10 @@ Builder.prototype.build = function(cb) {
       json._sig = sig;
       self.data(json);
       return self.build(cb);
+    }
+
+    if (!self._attachments.length) {
+      return cb(null, self._data.value);
     }
 
     toForm({
