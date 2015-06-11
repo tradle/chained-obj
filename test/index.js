@@ -115,8 +115,11 @@ test('deterministically sort attachments', function(t) {
   });
 });
 
-test('sign, hash, build, parse, verify', function(t) {
-  var attachments = imgs.map(function(iPath) {
+test('sign, hash, build, parse, verify', endToEnd.bind(null, false))
+test('sign, hash, build, parse, verify (with attachments)', endToEnd.bind(null, true))
+
+function endToEnd(withAttachments, t) {
+  var attachments = withAttachments && imgs.map(function(iPath) {
     return {
       name: path.basename(iPath, path.extname(iPath)),
       path: iPath
@@ -133,7 +136,8 @@ test('sign, hash, build, parse, verify', function(t) {
   };
 
   b.data(data);
-  attachments.forEach(b.attach, b);
+  if (withAttachments) attachments.forEach(b.attach, b);
+
   b.signWith(key);
   b.build(function(err, buf) {
     if (err) throw err;
@@ -145,4 +149,4 @@ test('sign, hash, build, parse, verify', function(t) {
     })
     .verifyWith(key);
   });
-})
+}
