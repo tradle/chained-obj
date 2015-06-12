@@ -41,6 +41,8 @@
   },
   "devDependencies": {
     "midentity": "git://github.com/mvayngrib/identity#dev",
-    "stream-equal": "^0.1.5"
+    "readable-stream": "^2.0.0",
+    "stream-equal": "^0.1.5",
+    "through2": "^2.0.0"
   }
 }

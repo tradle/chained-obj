@@ -1,7 +1,9 @@
 
 var fs = require('fs');
-var test = require('tape');
 var path = require('path');
+var test = require('tape');
+var Readable = require('readable-stream')
+var through2 = require('through2')
 var bufferEqual = require('buffer-equal');
 var streamEqual = require('stream-equal');
 var concat = require('concat-stream');
@@ -43,6 +45,32 @@ test('build single-part, parse', function(t) {
       t.deepEqual(parsed.attachments, []);
     });
   }
+});
+
+test('streaming parse', function(t) {
+  var num = 5
+  t.plan(num * 2);
+
+  var data = [];
+  for (var i = 0; i < num; i++) {
+    data.push({
+      blah: i
+    })
+  }
+
+  var stream = new Readable({ objectMode: true })
+  data.forEach(function (d) {
+    stream.push(new Buffer(JSON.stringify(d)))
+  })
+
+  stream.push(null)
+  stream
+    .pipe(new Parser())
+    .pipe(through2.obj(function transform(parsed, enc, done) {
+      t.deepEqual(parsed.data.value, data.shift());
+      t.deepEqual(parsed.attachments, []);
+      done()
+    }))
 });
 
 test('build multipart, parse', function(t) {

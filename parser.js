@@ -1,4 +1,6 @@
 
+var util = require('util')
+var Transform = require('stream').Transform
 var formidable = require('formidable');
 var MockReq = require('mock-req');
 var FormData = require('form-data');
@@ -14,10 +16,25 @@ var CONSTANTS = require('./constants');
 var Builder = require('./builder');
 var stringify = require('tradle-utils').stringify;
 
+module.exports = Parser;
+util.inherits(Parser, Transform)
+
 function Parser() {
   if (!(this instanceof Parser)) return new Parser();
 
-  this._attachments = [];
+  Transform.call(this, {
+    objectMode: true
+  })
+}
+
+Parser.prototype._transform = function (data, enc, cb) {
+  var self = this
+  this.parse(data, function (err, parsed) {
+    if (err) return cb(err)
+
+    self.push(parsed)
+    cb()
+  })
 }
 
 /**
@@ -34,19 +51,23 @@ Parser.prototype.parse = function(form, cb) {
   firstLine(form, function(line) {
     if (line.slice(0, 2) === '--') {
       // multipart
-      self._boundary = line.slice(2); // cut off leading "--"
-      self._parse(form, cb);
+      var boundary = line.slice(2); // cut off leading "--"
+      self._parse(form, boundary, cb);
     }
     else {
       // one part
-      self._data = {
-        name: CONSTANTS.DATA_ARG_NAME,
-        value: JSON.parse(form.toString())
+      var result = {
+        data: {
+          name: CONSTANTS.DATA_ARG_NAME,
+          value: JSON.parse(form.toString())
+        },
+        attachments: []
       }
 
-      self._validate(function(err) {
+      self._validate(result, function(err) {
         if (err) return cb(err)
-        else cb(null, self._result());
+
+        cb(null, result)
       })
     }
   });
@@ -69,9 +90,10 @@ Parser.prototype.verifyWith = function(verifier) {
  * @param  {String|Buffer} form
  * @param  {Function} cb
  */
-Parser.prototype._parse = function(form, cb) {
+Parser.prototype._parse = function(form, boundary, cb) {
   var self = this;
-  var attachments = this._attachments;
+  var data
+  var attachments = [];
   var error;
   var togo = 0;
 
@@ -85,7 +107,7 @@ Parser.prototype._parse = function(form, cb) {
 
   var headers = {};
   headers['Content-Length'] = form.length;
-  headers['Content-Type'] = 'multipart/form-data; boundary=' + this._boundary;
+  headers['Content-Type'] = 'multipart/form-data; boundary=' + boundary;
   var req = new MockReq({
     method: 'POST',
     headers: headers
@@ -96,17 +118,23 @@ Parser.prototype._parse = function(form, cb) {
   incoming.parse(req, function(err, fields, files) {
     if (err) return cb(err);
 
-    self._validate(function(err, valid) {
+    var result = {
+      data: data,
+      attachments: attachments,
+      boundary: boundary
+    }
+
+    self._validate(result, function(err, valid) {
       if (err) return cb(err);
       if (!valid) return cb(new Error('invalid form'));
 
-      cb(null, self._result());
+      cb(null, result);
     });
   });
 
   function push(key, val) {
-    if (!self._data) {
-      self._data = {
+    if (!data) {
+      data = {
         name: key,
         value: JSON.parse(val)
       }
@@ -120,16 +148,9 @@ Parser.prototype._parse = function(form, cb) {
   }
 }
 
-Parser.prototype._result = function() {
-  return {
-    data: this._data,
-    attachments: this._attachments
-  }
-}
-
-Parser.prototype._validate = function(cb) {
+Parser.prototype._validate = function(result, cb) {
   var self = this;
-  var data = this._data.value;
+  var data = result.data.value;
   var unsigned;
   var sig;
   if (this._verifier) {
@@ -141,7 +162,7 @@ Parser.prototype._validate = function(cb) {
 
   var b = new Builder();
   b.data(unsigned || data);
-  this._attachments.forEach(b.attach, b);
+  result.attachments.forEach(b.attach, b);
 
   b.hash(function(err, hash) {
     if (sig && self._verifier) {
@@ -152,11 +173,12 @@ Parser.prototype._validate = function(cb) {
       if (!verified) return cb(new Error('invalid signature'));
 
       delete self._verifier;
-      return self._validate(cb);
+      return self._validate(result, cb);
     }
 
     if (err) return cb(err);
-    cb(null, hash === self._boundary);
+
+    cb(null, hash === result.boundary);
   })
 }
 
@@ -195,5 +217,3 @@ function toStream(data) {
 
   return data;
 }
-
-module.exports = Parser;
