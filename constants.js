@@ -1,5 +1,4 @@
-
-var DATA_ARG_NAME = 'data';
+var DATA_ARG_NAME = 'data'
 
 module.exports = {
   DATA_ARG_NAME: DATA_ARG_NAME,

@@ -4,8 +4,13 @@
   "description": "create multipart on-chain objects",
   "main": "index.js",
   "scripts": {
-    "test": "node test/*.js"
+    "test": "node test/*.js",
+    "style": "standard"
   },
+  "pre-commit": [
+    "style",
+    "test"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/tradle/chained-obj"
@@ -40,7 +45,9 @@
   },
   "devDependencies": {
     "midentity": "git://github.com/tradle/identity",
+    "pre-commit": "^1.0.10",
     "readable-stream": "^2.0.0",
+    "standard": "^4.3.2",
     "stream-equal": "^0.1.5",
     "through2": "^2.0.0"
   }
