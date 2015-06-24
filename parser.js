@@ -7,10 +7,9 @@ var FormData = require('form-data');
 var bufferEqual = require('buffer-equal');
 var buf2stream = require('simple-bufferstream');
 var concat = require('concat-stream');
-var once = require('once');
 var isStream = require('isstream');
-var dezalgo = require('dezalgo');
 var assert = require('assert');
+var safe = require('safecb')
 var omit = require('object.omit');
 var CONSTANTS = require('./constants');
 var Builder = require('./builder');
@@ -97,7 +96,7 @@ Parser.prototype._parse = function(form, boundary, cb) {
   var error;
   var togo = 0;
 
-  cb = once(cb);
+  cb = safe(cb);
 
   var incoming = new formidable.IncomingForm();
 
@@ -142,7 +141,8 @@ Parser.prototype._parse = function(form, boundary, cb) {
     else {
       attachments.push({
         name: key,
-        path: val.path
+        path: val.path,
+        contentType: val.type
       });
     }
   }
@@ -164,11 +164,12 @@ Parser.prototype._validate = function(result, cb) {
   b.data(unsigned || data);
   result.attachments.forEach(b.attach, b);
 
-  b.hash(function(err, hash) {
+  b.build(function(err, build) {
     if (sig && self._verifier) {
-      var verified;
-      if (typeof this._verifier === 'function') verified = self._verifier(hash, sig);
-      else verified = self._verifier.verify(hash, sig);
+      var verified
+      var form = build.form
+      if (typeof self._verifier === 'function') verified = self._verifier(form, sig);
+      else verified = self._verifier.verify(form, sig);
 
       if (!verified) return cb(new Error('invalid signature'));
 
@@ -178,7 +179,7 @@ Parser.prototype._validate = function(result, cb) {
 
     if (err) return cb(err);
 
-    cb(null, hash === result.boundary);
+    cb(null, build.boundary === result.boundary);
   })
 }
 
@@ -187,7 +188,7 @@ Parser.parse = function(buf, cb) {
 }
 
 function firstLine(buf, cb) {
-  cb = once(dezalgo(cb));
+  cb = safe(cb);
   if (typeof buf === 'string') return cb(buf.slice(0, buf.indexOf(FormData.LINE_BREAK)));
 
   var stream = buf2stream(buf);

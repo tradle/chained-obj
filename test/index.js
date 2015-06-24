@@ -27,19 +27,19 @@ test('build single-part, parse', function(t) {
     blah: 1
   };
 
-  parse(null, new Buffer(JSON.stringify(data)));
-  parse(null, JSON.stringify(data));
+  parse(null, { form: new Buffer(JSON.stringify(data)) });
+  parse(null, { form: JSON.stringify(data) });
 
   var b = new Builder()
     .data(data)
     .build(parse);
 
 
-  function parse(err, buf) {
+  function parse(err, build) {
     if (err) throw err;
 
-    Parser.parse(buf, function(err, parsed) {
-      if (err) throw err;
+    Parser.parse(build.form, function(err, parsed) {
+      if (err) throw err
 
       t.deepEqual(parsed.data.value, data);
       t.deepEqual(parsed.attachments, []);
@@ -90,11 +90,12 @@ test('build multipart, parse', function(t) {
   attachments.forEach(b.attach, b);
   b.build(parse);
 
-  function parse(err, buf) {
+  function parse(err, build) {
     if (err) throw err;
 
-    Parser.parse(buf.toString('binary'), onParsed);
-    Parser.parse(buf, onParsed);
+    var form = build.form
+    Parser.parse(form.toString('binary'), onParsed);
+    Parser.parse(form, onParsed);
   }
 
   function onParsed(err, parsed) {
@@ -136,9 +137,9 @@ test('deterministically sort attachments', function(t) {
     b.build(cb);
   }
 
-  build(attachments, function(err, buf) {
-    build(attachments.reverse(), function(err, rev) {
-      t.ok(bufferEqual(buf, rev));
+  build(attachments, function(err, r1) {
+    build(attachments.reverse(), function(err, r2) {
+      t.deepEqual(r1, r2);
     });
   });
 });
@@ -167,10 +168,11 @@ function endToEnd(withAttachments, t) {
   if (withAttachments) attachments.forEach(b.attach, b);
 
   b.signWith(key);
-  b.build(function(err, buf) {
+  b.build(function(err, build) {
     if (err) throw err;
 
-    Parser.parse(buf, function(err, parsed) {
+    global.formy = build.form
+    Parser.parse(build.form, function(err, parsed) {
       if (err) throw err;
 
       t.end();

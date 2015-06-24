@@ -2,16 +2,17 @@
 var fs = require('fs');
 var path = require('path');
 var mime = require('mime-types');
+var extend = require('extend')
 var typeforce = require('typeforce');
 var bufIndexOf = require('buffer-indexof')
 var FormData = require('form-data');
 var stringify = require('tradle-utils').stringify;
 var concat = require('concat-stream');
 var crypto = require('crypto');
-var once = require('once');
+var safe = require('safecb');
 var find = require('array-find');
-var dezalgo = require('dezalgo');
 var CONSTANTS = require('./constants');
+var BUFFER_ENC = 'binary'
 
 /**
  * multipart form builder with a deterministically generated boundary
@@ -30,17 +31,9 @@ function Builder() {
  * @return {Builder} this Builder
  */
 Builder.prototype.data = function(json) {
-  if (typeof json === 'object') {
-    if (Buffer.isBuffer(json)) json = JSON.parse(json);
-
-    json = stringify(json);
-  }
-
-  if (typeof json === 'string') json = new Buffer(json, 'binary');
-
   this._data = {
     name: CONSTANTS.DATA_ARG_NAME,
-    value: json
+    value: parseJSON(json) // to ensure it's stringified correctly (deterministically)
   };
 
   this._hashed = false;
@@ -52,6 +45,7 @@ Builder.prototype.data = function(json) {
  * @param  {Object} options
  * @param  {String} options.name - attachment name
  * @param  {String} options.path - attachment file path
+ * @param  {String} options.contentType (optional)
  * @return {Builder} this Builder
  */
 Builder.prototype.attach = function(options) {
@@ -67,6 +61,7 @@ Builder.prototype.attach = function(options) {
   this._attachments.push({
     name: options.name,
     path: path.resolve(options.path),
+    contentType: options.contentType || mime.lookup(options.path),
     isFile: true
   });
 
@@ -90,36 +85,43 @@ Builder.prototype.signWith = function(signer) {
 Builder.prototype.build = function(cb) {
   var self = this;
 
-  cb = dezalgo(cb);
+  cb = safe(cb);
   if (!this._checkReady(cb)) return;
 
   this.hash(function(err, hash) {
     if (err) return cb(err);
 
-    if (self._signer) {
+    mkForm(function (err, result) {
+      if (err) return cb(err)
+      if (!self._signer) return cb(null, result)
+
       var sig;
       if (self._signer.sign) {
-        sig = self._signer.sign(hash);
+        sig = self._signer.sign(result.form);
       }
       else {
-        sig = self._signer(sig);
+        sig = self._signer(result.form);
       }
 
       delete self._signer;
-      var json = JSON.parse(self._data.value);
+      var json = parseJSON(self._data.value);
       json._sig = sig;
       self.data(json);
-      return self.build(cb);
-    }
+      self.build(cb);
+    })
 
-    if (!self._attachments.length) {
-      return cb(null, self._data.value);
-    }
+    function mkForm (onmade) {
+      if (!self._attachments.length) {
+        return onmade(null, {
+          form: toBuffer(self._data.value)
+        });
+      }
 
-    toForm({
-      parts: [self._data].concat(self._attachments),
-      boundary: hash
-    }, cb);
+      toForm({
+        parts: [self._data].concat(self._attachments),
+        boundary: hash
+      }, onmade);
+    }
   });
 }
 
@@ -148,7 +150,7 @@ Builder.prototype._checkReady = function(cb) {
 }
 
 Builder.prototype._readAttachments = function(cb) {
-  cb = once(cb);
+  cb = safe(cb);
 
   var togo = this._attachments.length + 1;
   this._attachments.forEach(function(a) {
@@ -210,32 +212,35 @@ Builder.prototype.hash = function(cb) {
 }
 
 function toForm(options, cb) {
-  cb = once(cb);
+  cb = safe(cb);
 
   var form = new FormData();
 
   // override boundary
-  form._boundary = options.boundary || CONSTANTS.DEFAULT_BOUNDARY;
+  var boundary = form._boundary = options.boundary || CONSTANTS.DEFAULT_BOUNDARY;
   options.parts.forEach(function(part) {
     // var val = part.isFile ? fs.createReadStream(part.value) : part.value;
     var opts = {};
     if (part.isFile) {
-      opts.contentType = mime.lookup(part.path)
       opts.filename = part.hash;
     }
 
-    form.append(part.name, part.value, opts);
+    form.append(part.name, toBuffer(part.value), opts);
   });
 
   form.on('error', cb);
 
   form.pipe(concat({ encoding: 'buffer' }, function(buf) {
-    cb(null, buf);
+    cb(null, {
+      form: buf,
+      boundary: boundary
+    });
   }));
 }
 
 function getHash(data) {
   // if hash is contained in file, hash the hash till it isn't
+  data = toBuffer(data)
   var idx;
   var hash;
   do {
@@ -247,6 +252,21 @@ function getHash(data) {
   while (idx !== -1);
 
   return hash;
+}
+
+function parseJSON (json) {
+  if (typeof json === 'string') return JSON.parse(json)
+  if (Buffer.isBuffer(json)) return JSON.parse(json.toString(BUFFER_ENC))
+
+  return json
+}
+
+function toBuffer (json) {
+  var buf = json
+  if (typeof json === 'string') buf = new Buffer(json, BUFFER_ENC)
+  if (!Buffer.isBuffer(json)) buf = new Buffer(stringify(json), BUFFER_ENC)
+
+  return buf
 }
 
 module.exports = Builder;
