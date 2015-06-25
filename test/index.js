@@ -36,7 +36,7 @@ test('build single-part, parse', function (t) {
     Parser.parse(build.form, function (err, parsed) {
       if (err) throw err
 
-      t.deepEqual(parsed.data.value, data)
+      t.deepEqual(parsed.data, data)
       t.deepEqual(parsed.attachments, [])
     })
   }
@@ -62,7 +62,7 @@ test('streaming parse', function (t) {
   stream
     .pipe(new Parser())
     .pipe(through2.obj(function transform (parsed, enc, done) {
-      t.deepEqual(parsed.data.value, data.shift())
+      t.deepEqual(parsed.data, data.shift())
       t.deepEqual(parsed.attachments, [])
       done()
     }))
@@ -96,7 +96,7 @@ test('build multipart, parse', function (t) {
   function onParsed (err, parsed) {
     if (err) throw err
 
-    t.deepEqual(parsed.data.value, data)
+    t.deepEqual(parsed.data, data)
     parsed.attachments.forEach(function (rAtt, i) {
       var a = fs.createReadStream(rAtt.path)
       var b = fs.createReadStream(attachments[i].path)

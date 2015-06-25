@@ -8,7 +8,6 @@ var isStream = require('isstream')
 var assert = require('assert')
 var safe = require('safecb')
 var omit = require('object.omit')
-var CONSTANTS = require('./constants')
 var Builder = require('./builder')
 
 module.exports = Parser
@@ -51,10 +50,7 @@ Parser.prototype.parse = function (form, cb) {
     } else {
       // one part
       var result = {
-        data: {
-          name: CONSTANTS.DATA_ARG_NAME,
-          value: JSON.parse(form.toString())
-        },
+        data: JSON.parse(form.toString()),
         attachments: []
       }
 
@@ -125,10 +121,7 @@ Parser.prototype._parse = function (form, boundary, cb) {
 
   function push (key, val) {
     if (!data) {
-      data = {
-        name: key,
-        value: JSON.parse(val)
-      }
+      data = JSON.parse(val)
     } else {
       attachments.push({
         name: key,
@@ -141,7 +134,7 @@ Parser.prototype._parse = function (form, boundary, cb) {
 
 Parser.prototype._validate = function (result, cb) {
   var self = this
-  var data = result.data.value
+  var data = result.data
   var unsigned
   var sig
   if (this._verifier) {

@@ -29,11 +29,7 @@ function Builder () {
  * @return {Builder} this Builder
  */
 Builder.prototype.data = function (json) {
-  this._data = {
-    name: CONSTANTS.DATA_ARG_NAME,
-    value: parseJSON(json) // to ensure it's stringified correctly (deterministically)
-  }
-
+  this._data = parseJSON(json) // to ensure it's stringified correctly (deterministically)
   this._hashed = false
   return this
 }
@@ -99,7 +95,7 @@ Builder.prototype.build = function (cb) {
       }
 
       delete self._signer
-      var json = parseJSON(self._data.value)
+      var json = parseJSON(self._data)
       json._sig = sig
       self.data(json)
       self.build(cb)
@@ -108,16 +104,26 @@ Builder.prototype.build = function (cb) {
     function mkForm (onmade) {
       if (!self._attachments.length) {
         return onmade(null, {
-          form: toBuffer(self._data.value)
+          form: toBuffer(self._data)
         })
       }
 
       toForm({
-        parts: [self._data].concat(self._attachments),
+        parts: self._getParts(),
         boundary: hash
       }, onmade)
     }
   })
+}
+
+Builder.prototype._getParts = function () {
+  var parts = [{
+    name: CONSTANTS.DATA_ARG_NAME,
+    value: this._data
+  }]
+
+  parts.push.apply(parts, this._attachments)
+  return parts
 }
 
 Builder.prototype._getAttachment = function (name) {
@@ -201,7 +207,7 @@ Builder.prototype.hash = function (cb) {
       return a.hash
     })
 
-    hashes.unshift(getHash(self._data.value))
+    hashes.unshift(getHash(self._data))
     cb(null, getHash(hashes.join('')))
   })
 }
