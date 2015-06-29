@@ -8,7 +8,9 @@ var isStream = require('isstream')
 var assert = require('assert')
 var safe = require('safecb')
 var omit = require('object.omit')
+var CONSTANTS = require('tradle-constants')
 var Builder = require('./builder')
+var SIG = CONSTANTS.SIG
 
 module.exports = Parser
 util.inherits(Parser, Transform)
@@ -138,10 +140,10 @@ Parser.prototype._validate = function (result, cb) {
   var unsigned
   var sig
   if (this._verifier) {
-    if (!data._sig) return cb(new Error("object is not signed, can't verify"))
+    if (!data[SIG]) return cb(new Error("object is not signed, can't verify"))
 
-    sig = data._sig
-    unsigned = omit(data, '_sig')
+    sig = data[SIG]
+    unsigned = omit(data, SIG)
   }
 
   var b = new Builder()

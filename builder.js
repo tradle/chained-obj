@@ -9,7 +9,7 @@ var concat = require('concat-stream')
 var crypto = require('crypto')
 var safe = require('safecb')
 var find = require('array-find')
-var CONSTANTS = require('./constants')
+var CONSTANTS = require('tradle-constants')
 var BUFFER_ENC = 'binary'
 
 /**
@@ -96,7 +96,7 @@ Builder.prototype.build = function (cb) {
 
       delete self._signer
       var json = parseJSON(self._data)
-      json._sig = sig
+      json[CONSTANTS.SIG] = sig
       self.data(json)
       self.build(cb)
     })

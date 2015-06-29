@@ -40,6 +40,7 @@
     "object.omit": "^1.1.0",
     "safecb": "0.0.1",
     "simple-bufferstream": "^1.0.0",
+    "tradle-constants": "git://github.com/mvayngrib/tradle-constants",
     "tradle-utils": "git://github.com/tradle/tradle-utils",
     "typeforce": "^1.0.0"
   },
