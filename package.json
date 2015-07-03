@@ -1,6 +1,6 @@
 {
   "name": "chained-obj",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "create multipart on-chain objects",
   "main": "index.js",
   "scripts": {
