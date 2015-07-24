@@ -29,7 +29,6 @@
   "homepage": "https://github.com/tradle/chained-obj",
   "dependencies": {
     "array-find": "^0.1.1",
-    "buffer-equal": "0.0.1",
     "buffer-indexof": "0.0.2",
     "concat-stream": "^1.4.8",
     "form-data": "^0.2.0",
