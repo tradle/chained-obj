@@ -43,6 +43,11 @@ Builder.prototype.data = function (json) {
  * @return {Builder} this Builder
  */
 Builder.prototype.attach = function (options) {
+  if (Array.isArray(options)) {
+    options.forEach(this.attach, this)
+    return this
+  }
+
   typeforce({
     path: 'String',
     name: 'String'

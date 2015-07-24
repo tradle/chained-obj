@@ -71,7 +71,6 @@ test('streaming parse', function (t) {
 test('build multipart, parse', function (t) {
   t.plan(4)
 
-  var b = new Builder()
   var data = {
     blah: 1
   }
@@ -81,9 +80,10 @@ test('build multipart, parse', function (t) {
     path: imgs[0]
   }]
 
-  b.data(data)
-  attachments.forEach(b.attach, b)
-  b.build(parse)
+  Builder()
+    .data(data)
+    .attach(attachments)
+    .build(parse)
 
   function parse (err, build) {
     if (err) throw err
@@ -124,14 +124,12 @@ test('deterministically sort attachments', function (t) {
   }]
 
   function build (att, cb) {
-    var b = new Builder()
-    var data = {
-      blah: 1
-    }
-
-    b.data(data)
-    attachments.forEach(b.attach, b)
-    b.build(cb)
+    Builder()
+      .data({
+        blah: 1
+      })
+      .attach(attachments)
+      .build(cb)
   }
 
   build(attachments, function (err, r1) {
@@ -160,15 +158,16 @@ function endToEnd (withAttachments, t) {
     purpose: 'sign'
   })
 
-  var b = new Builder()
   var data = {
     blah: 1
   }
 
-  b.data(data)
-  if (withAttachments) attachments.forEach(b.attach, b)
+  var b = new Builder()
+    .data(data)
+    .signWith(key)
 
-  b.signWith(key)
+  if (withAttachments) b.attach(attachments)
+
   b.build(function (err, build) {
     if (err) throw err
 
