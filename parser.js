@@ -73,7 +73,11 @@ Parser.prototype.parse = function (form, cb) {
  * @return {Parser} this Parser instance
  */
 Parser.prototype.verifyWith = function (verifier) {
-  this._verifier = verifier
+  // TODO: move _verify to a separate state object
+  this._verify = typeof verifier === 'function' ?
+    verifier :
+    verifier.verify.bind(verifier)
+
   return this
 }
 
@@ -138,8 +142,10 @@ Parser.prototype._validate = function (result, cb) {
   var self = this
   var data = result.data
   var unsigned
+  var verify = this._verify
   var sig
-  if (this._verifier) {
+  if (verify) {
+    delete self._verify
     if (!data[SIG]) return cb(new Error("object is not signed, can't verify"))
 
     sig = data[SIG]
@@ -151,19 +157,16 @@ Parser.prototype._validate = function (result, cb) {
   result.attachments.forEach(b.attach, b)
 
   b.build(function (err, build) {
-    if (sig && self._verifier) {
-      var verified
-      var form = build.form
-      if (typeof self._verifier === 'function') verified = self._verifier(form, sig)
-      else verified = self._verifier.verify(form, sig)
-
-      if (!verified) return cb(new Error('invalid signature'))
-
-      delete self._verifier
-      return self._validate(result, cb)
-    }
-
     if (err) return cb(err)
+    if (sig && verify) {
+      var form = build.form
+      return verify(form, sig, function (err, verified) {
+        if (err) return cb(err)
+        if (!verified) return cb(new Error('invalid signature'))
+
+        return self._validate(result, cb)
+      })
+    }
 
     cb(null, build.boundary === result.boundary)
   })

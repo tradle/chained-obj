@@ -5,9 +5,9 @@ var Readable = require('readable-stream')
 var through2 = require('through2')
 var streamEqual = require('stream-equal')
 
-var mi = require('midentity')
+var kiki = require('kiki')
 // var Identity = mi.Identity
-var Keys = mi.Keys
+var Keys = kiki.Keys
 var Builder = require('../builder')
 var Parser = require('../parser')
 var imgs = [

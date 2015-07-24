@@ -66,7 +66,7 @@ Builder.prototype.attach = function (options) {
  * @return {Builder} this Builder
  */
 Builder.prototype.signWith = function (signer) {
-  this._signer = signer
+  this._signFn = typeof signer === 'function' ? signer : signer.sign.bind(signer)
   return this
 }
 
@@ -85,20 +85,19 @@ Builder.prototype.build = function (cb) {
 
     mkForm(function (err, result) {
       if (err) return cb(err)
-      if (!self._signer) return cb(null, result)
+      // TODO: move _signFn to a separate state object
+      if (!self._signFn) return cb(null, result)
 
-      var sig
-      if (self._signer.sign) {
-        sig = self._signer.sign(result.form)
-      } else {
-        sig = self._signer(result.form)
-      }
+      self._signFn(result.form, function (err, sig) {
+        if (err) return cb(err)
 
-      delete self._signer
-      var json = parseJSON(self._data)
-      json[CONSTANTS.SIG] = sig
-      self.data(json)
-      self.build(cb)
+        var json = parseJSON(self._data)
+        json[CONSTANTS.SIG] = sig
+        self.data(json)
+        self.build(cb)
+      })
+
+      delete self._signFn
     })
 
     function mkForm (onmade) {
