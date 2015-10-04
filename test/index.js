@@ -171,7 +171,6 @@ function endToEnd (withAttachments, t) {
   b.build(function (err, build) {
     if (err) throw err
 
-    global.formy = build.form
     Parser.parse(build.form, function (err, parsed) {
       if (err) throw err
 
