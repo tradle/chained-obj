@@ -4,12 +4,17 @@ var mime = require('mime-types')
 var typeforce = require('typeforce')
 var bufIndexOf = require('buffer-indexof')
 var FormData = require('form-data')
-var stringify = require('tradle-utils').stringify
+var utils = require('tradle-utils')
+var stringify = utils.stringify
 var concat = require('concat-stream')
 var crypto = require('crypto')
 var safe = require('safecb')
 var find = require('array-find')
 var CONSTANTS = require('tradle-constants')
+var extend = require('xtend')
+// var ROOT_HASH = CONSTANTS.ROOT_HASH
+// var PREV_HASH = CONSTANTS.PREV_HASH
+var NONCE = CONSTANTS.NONCE
 var BUFFER_ENC = 'binary'
 
 /**
@@ -29,7 +34,7 @@ function Builder () {
  * @return {Builder} this Builder
  */
 Builder.prototype.data = function (json) {
-  this._data = parseJSON(json) // to ensure it's stringified correctly (deterministically)
+  this._data = extend(parseJSON(json)) // to ensure it's stringified correctly (deterministically)
   this._hashed = false
   return this
 }
@@ -75,49 +80,96 @@ Builder.prototype.signWith = function (signer) {
   return this
 }
 
+Builder.addNonce = function (data, cb) {
+  if (data[NONCE]) return process.nextTick(cb)
+
+  crypto.randomBytes(32, function (err, bytes) {
+    if (err) return cb(err)
+
+    data[NONCE] = bytes.toString('base64')
+    cb()
+  })
+}
+
+Builder.prototype._addNonce = function (cb) {
+  Builder.addNonce(this._data, cb)
+}
+
 /**
  * build the form to a buffer
  * @param  {Function} cb
  */
 Builder.prototype.build = function (cb) {
   var self = this
+  var hash
 
   cb = safe(cb)
   if (!this._checkReady(cb)) return
 
-  this.hash(function (err, hash) {
+  this._addNonce(hashIt)
+
+  function hashIt (err) {
     if (err) return cb(err)
 
-    mkForm(function (err, result) {
+    self.hash(function (err, _hash) {
       if (err) return cb(err)
-      // TODO: move _signFn to a separate state object
-      if (!self._signFn) return cb(null, result)
 
-      self._signFn(result.form, function (err, sig) {
-        if (err) return cb(err)
+      hash = _hash
+      mkForm()
+    })
+  }
 
-        var json = parseJSON(self._data)
-        json[CONSTANTS.SIG] = sig
-        self.data(json)
-        self.build(cb)
+  function mkForm () {
+    if (!self._attachments.length) {
+      return onMadeForm(null, {
+        form: toBuffer(self._data)
       })
+    }
 
-      delete self._signFn
+    toForm({
+      parts: self._getParts(),
+      boundary: hash
+    }, onMadeForm)
+  }
+
+  function onMadeForm (err, result) {
+    if (err) return cb(err)
+
+    // TODO: move _signFn to a separate state object
+    maybeUpdate(result.form, function (err, updated) {
+      if (err) return cb(err)
+
+      if (updated) {
+        self.data(updated)
+        self.build(cb)
+      } else {
+        maybeSign(result)
+      }
+    })
+  }
+
+  function maybeUpdate (buf, onUpdated) {
+    onUpdated()
+    // if (!self._prev) return onUpdated()
+
+    // var json = parseJSON(self._data)
+    // utils.getStorageKeyFor(self._data)
+  }
+
+  function maybeSign (result) {
+    if (!self._signFn) return cb(null, result)
+
+    self._signFn(result.form, function (err, sig) {
+      if (err) return cb(err)
+
+      var json = parseJSON(self._data)
+      json[CONSTANTS.SIG] = sig
+      self.data(json)
+      self.build(cb)
     })
 
-    function mkForm (onmade) {
-      if (!self._attachments.length) {
-        return onmade(null, {
-          form: toBuffer(self._data)
-        })
-      }
-
-      toForm({
-        parts: self._getParts(),
-        boundary: hash
-      }, onmade)
-    }
-  })
+    delete self._signFn
+  }
 }
 
 Builder.prototype._getParts = function () {

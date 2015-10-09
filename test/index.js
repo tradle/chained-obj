@@ -10,6 +10,7 @@ var kiki = require('kiki')
 var Keys = kiki.Keys
 var Builder = require('../builder')
 var Parser = require('../parser')
+var NONCE = require('tradle-constants').NONCE
 var imgs = [
   './test/logo.png',
   './test/logo1.png',
@@ -36,6 +37,7 @@ test('build single-part, parse', function (t) {
     Parser.parse(build.form, function (err, parsed) {
       if (err) throw err
 
+      delete parsed.data[NONCE]
       t.deepEqual(parsed.data, data)
       t.deepEqual(parsed.attachments, [])
     })
@@ -62,6 +64,7 @@ test('streaming parse', function (t) {
   stream
     .pipe(new Parser())
     .pipe(through2.obj(function transform (parsed, enc, done) {
+      delete parsed.data[NONCE]
       t.deepEqual(parsed.data, data.shift())
       t.deepEqual(parsed.attachments, [])
       done()
@@ -96,6 +99,7 @@ test('build multipart, parse', function (t) {
   function onParsed (err, parsed) {
     if (err) throw err
 
+    delete parsed.data[NONCE]
     t.deepEqual(parsed.data, data)
     parsed.attachments.forEach(function (rAtt, i) {
       var a = fs.createReadStream(rAtt.path)
@@ -123,22 +127,26 @@ test('deterministically sort attachments', function (t) {
     path: imgs[2]
   }]
 
+  var data = {
+    blah: 1
+  }
+
   function build (att, cb) {
     Builder()
-      .data({
-        blah: 1
-      })
+      .data(data)
       .attach(attachments)
       .build(cb)
   }
 
-  build(attachments, function (err, r1) {
-    if (err) throw err
-
-    build(attachments.reverse(), function (err, r2) {
+  Builder.addNonce(data, function () {
+    build(attachments, function (err, r1) {
       if (err) throw err
 
-      t.deepEqual(r1, r2)
+      build(attachments.reverse(), function (err, r2) {
+        if (err) throw err
+
+        t.deepEqual(r1, r2)
+      })
     })
   })
 })
