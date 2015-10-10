@@ -11,6 +11,7 @@ var omit = require('object.omit')
 var CONSTANTS = require('tradle-constants')
 var Builder = require('./builder')
 var SIG = CONSTANTS.SIG
+var NONCE = CONSTANTS.NONCE
 
 module.exports = Parser
 util.inherits(Parser, Transform)
@@ -140,7 +141,13 @@ Parser.prototype._parse = function (form, boundary, cb) {
 
 Parser.prototype._validate = function (result, cb) {
   var self = this
+  cb = safe(cb)
+
   var data = result.data
+  if (!result.data[NONCE]) {
+    return cb(new Error('missing message nonce'))
+  }
+
   var unsigned
   var verify = this._verify
   var sig

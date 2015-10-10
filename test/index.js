@@ -24,6 +24,7 @@ test('build single-part, parse', function (t) {
     blah: 1
   }
 
+  data[NONCE] = '1234'
   parse(null, { form: new Buffer(JSON.stringify(data)) })
   parse(null, { form: JSON.stringify(data) })
 
@@ -37,7 +38,6 @@ test('build single-part, parse', function (t) {
     Parser.parse(build.form, function (err, parsed) {
       if (err) throw err
 
-      delete parsed.data[NONCE]
       t.deepEqual(parsed.data, data)
       t.deepEqual(parsed.attachments, [])
     })
@@ -53,6 +53,8 @@ test('streaming parse', function (t) {
     data.push({
       blah: i
     })
+
+    data[i][NONCE] = '' + i
   }
 
   var stream = new Readable({ objectMode: true })
@@ -64,7 +66,6 @@ test('streaming parse', function (t) {
   stream
     .pipe(new Parser())
     .pipe(through2.obj(function transform (parsed, enc, done) {
-      delete parsed.data[NONCE]
       t.deepEqual(parsed.data, data.shift())
       t.deepEqual(parsed.attachments, [])
       done()
