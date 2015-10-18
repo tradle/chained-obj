@@ -12,6 +12,7 @@ var safe = require('safecb')
 var find = require('array-find')
 var CONSTANTS = require('tradle-constants')
 var extend = require('xtend')
+var dataURIToBuffer = require('data-uri-to-buffer')
 // var ROOT_HASH = CONSTANTS.ROOT_HASH
 // var PREV_HASH = CONSTANTS.PREV_HASH
 var NONCE = CONSTANTS.NONCE
@@ -54,16 +55,38 @@ Builder.prototype.attach = function (options) {
   }
 
   typeforce({
-    path: 'String',
+    path: '?String',
+    buffer: '?Buffer',
+    dataURI: '?String',
     name: 'String'
   }, options)
 
   if (this._getAttachment(options.name)) throw new Error('duplicate attachment')
 
+  var buffer = options.buffer
+  var filePath = options.path && path.resolve(options.path)
+  var contentType = options.contentType
+  if (!contentType) {
+    if (options.path) {
+      contentType = mime.lookup(options.path)
+    } else if (options.dataURI) {
+      buffer = dataURIToBuffer(options.dataURI)
+    }
+  }
+
+  if (!contentType && buffer) {
+    contentType = buffer.type
+  }
+
+  if (!contentType) {
+    throw new Error('unable to deduce content type')
+  }
+
   this._attachments.push({
     name: options.name,
-    path: path.resolve(options.path),
-    contentType: options.contentType || mime.lookup(options.path),
+    path: filePath,
+    value: buffer,
+    contentType: contentType,
     isFile: true
   })
 

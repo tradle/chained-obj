@@ -4,6 +4,8 @@ var test = require('tape')
 var Readable = require('readable-stream')
 var through2 = require('through2')
 var streamEqual = require('stream-equal')
+var mime = require('mime-types')
+var DataURI = require('datauri')
 
 var kiki = require('kiki')
 // var Identity = mi.Identity
@@ -72,27 +74,67 @@ test('streaming parse', function (t) {
     }))
 })
 
-test('build multipart, parse', function (t) {
-  t.plan(4)
+test('build multipart (from path / from file), parse', function (t) {
+  t.plan(6)
 
   var data = {
-    blah: 1
+    blah: 1,
+    _z: '123'
   }
 
-  var attachments = [{
+  var att = {
     name: 'yy',
     path: imgs[0]
-  }]
+  }
 
-  Builder()
-    .data(data)
-    .attach(attachments)
-    .build(parse)
+  var attachments = [att]
+  var firstForm
+  var togo = 3
+  pathBased()
+  contentBased()
 
-  function parse (err, build) {
+  function pathBased () {
+    Builder()
+      .data(data)
+      .attach(attachments)
+      .build(check)
+  }
+
+  function contentBased () {
+    fs.readFile(att.path, function (err, buf) {
+      if (err) throw err
+
+      Builder()
+        .data(data)
+        .attach([{ name: att.name, buffer: buf, contentType: mime.lookup(att.path) }])
+        .build(check)
+    })
+
+    var encoder = new DataURI()
+    encoder.on('encoded', function (dataURI) {
+      Builder()
+        .data(data)
+        .attach([{ name: att.name, dataURI: dataURI }])
+        .build(check)
+    })
+
+    encoder.encode(att.path)
+  }
+
+  function check (err, build) {
     if (err) throw err
 
     var form = build.form
+    if (firstForm) {
+      t.deepEqual(form, firstForm)
+    } else {
+      firstForm = form
+    }
+
+    if (--togo === 0) parse(form)
+  }
+
+  function parse (form) {
     Parser.parse(form.toString('binary'), onParsed)
     Parser.parse(form, onParsed)
   }
@@ -100,7 +142,6 @@ test('build multipart, parse', function (t) {
   function onParsed (err, parsed) {
     if (err) throw err
 
-    delete parsed.data[NONCE]
     t.deepEqual(parsed.data, data)
     parsed.attachments.forEach(function (rAtt, i) {
       var a = fs.createReadStream(rAtt.path)
@@ -108,7 +149,7 @@ test('build multipart, parse', function (t) {
       streamEqual(a, b, function (err, equal) {
         if (err) throw err
 
-        t.equal(equal, true)
+        t.assert(equal)
       })
     })
   }
