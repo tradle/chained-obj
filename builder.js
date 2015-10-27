@@ -36,7 +36,6 @@ function Builder () {
  */
 Builder.prototype.data = function (json) {
   this._data = extend(parseJSON(json)) // to ensure it's stringified correctly (deterministically)
-  utils.validate(json)
   this._hashed = false
   return this
 }
@@ -134,6 +133,12 @@ Builder.prototype.build = function (cb) {
 
   function hashIt (err) {
     if (err) return cb(err)
+
+    try {
+      utils.validate(self._data)
+    } catch (err) {
+      return cb(err)
+    }
 
     self.hash(function (err, _hash) {
       if (err) return cb(err)
