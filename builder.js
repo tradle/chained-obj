@@ -4,8 +4,7 @@ var mime = require('mime-types')
 var typeforce = require('typeforce')
 var bufIndexOf = require('buffer-indexof')
 var FormData = require('form-data')
-var utils = require('tradle-utils')
-var stringify = utils.stringify
+var tutils = require('tradle-utils')
 var concat = require('concat-stream')
 var crypto = require('crypto')
 var safe = require('safecb')
@@ -13,6 +12,7 @@ var find = require('array-find')
 var CONSTANTS = require('tradle-constants')
 var extend = require('xtend')
 var dataURIToBuffer = require('data-uri-to-buffer')
+var utils = require('./utils')
 // var ROOT_HASH = CONSTANTS.ROOT_HASH
 // var PREV_HASH = CONSTANTS.PREV_HASH
 var NONCE = CONSTANTS.NONCE
@@ -36,6 +36,7 @@ function Builder () {
  */
 Builder.prototype.data = function (json) {
   this._data = extend(parseJSON(json)) // to ensure it's stringified correctly (deterministically)
+  utils.validate(json)
   this._hashed = false
   return this
 }
@@ -106,10 +107,10 @@ Builder.prototype.signWith = function (signer) {
 Builder.addNonce = function (data, cb) {
   if (data[NONCE]) return process.nextTick(cb)
 
-  crypto.randomBytes(32, function (err, bytes) {
+  tutils.newMsgNonce(function (err, nonce) {
     if (err) return cb(err)
 
-    data[NONCE] = bytes.toString('base64')
+    data[NONCE] = nonce
     cb()
   })
 }
@@ -176,7 +177,7 @@ Builder.prototype.build = function (cb) {
     // if (!self._prev) return onUpdated()
 
     // var json = parseJSON(self._data)
-    // utils.getStorageKeyFor(self._data)
+    // tutils.getStorageKeyFor(self._data)
   }
 
   function maybeSign (result) {
@@ -344,7 +345,7 @@ function parseJSON (json) {
 function toBuffer (json) {
   var buf = json
   if (typeof json === 'string') buf = new Buffer(json, BUFFER_ENC)
-  if (!Buffer.isBuffer(json)) buf = new Buffer(stringify(json), BUFFER_ENC)
+  if (!Buffer.isBuffer(json)) buf = new Buffer(tutils.stringify(json), BUFFER_ENC)
 
   return buf
 }

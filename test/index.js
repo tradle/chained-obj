@@ -212,6 +212,7 @@ function endToEnd (withAttachments, t) {
     blah: 1
   }
 
+  data[NONCE] = '123'
   var b = new Builder()
     .data(data)
     .signWith(key)

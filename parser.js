@@ -10,8 +10,8 @@ var safe = require('safecb')
 var omit = require('object.omit')
 var CONSTANTS = require('tradle-constants')
 var Builder = require('./builder')
+var utils = require('./utils')
 var SIG = CONSTANTS.SIG
-var NONCE = CONSTANTS.NONCE
 
 module.exports = Parser
 util.inherits(Parser, Transform)
@@ -144,8 +144,10 @@ Parser.prototype._validate = function (result, cb) {
   cb = safe(cb)
 
   var data = result.data
-  if (!result.data[NONCE]) {
-    return cb(new Error('missing message nonce'))
+  try {
+    utils.validate(result.data)
+  } catch (err) {
+    return cb(err)
   }
 
   var unsigned
