@@ -2,8 +2,8 @@
 
 var path = require('path')
 var fs = require('fs')
-var constants = require('tradle-constants')
-var utils = require('tradle-utils')
+var constants = require('@tradle/constants')
+var utils = require('@tradle/utils')
 var ChainedObj = require('./')
 var Builder = ChainedObj.Builder
 var filePath = process.argv[2]
