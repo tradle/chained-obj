@@ -7,12 +7,12 @@ var streamEqual = require('stream-equal')
 var mime = require('mime-types')
 var DataURI = require('datauri')
 
-var kiki = require('kiki')
+var kiki = require('@tradle/kiki')
 // var Identity = mi.Identity
 var Keys = kiki.Keys
 var Builder = require('../builder')
 var Parser = require('../parser')
-var NONCE = require('tradle-constants').NONCE
+var NONCE = require('@tradle/constants').NONCE
 var imgs = [
   './test/logo.png',
   './test/logo1.png',

@@ -1,4 +1,4 @@
-var CONSTANTS = require('tradle-constants')
+var CONSTANTS = require('@tradle/constants')
 var NONCE = CONSTANTS.NONCE
 var CUR_HASH = CONSTANTS.CUR_HASH
 var ROOT_HASH = CONSTANTS.ROOT_HASH

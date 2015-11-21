@@ -1,5 +1,5 @@
 {
-  "name": "chained-obj",
+  "name": "@tradle/chained-obj",
   "version": "1.3.2",
   "description": "create multipart on-chain objects",
   "main": "index.js",
@@ -40,14 +40,14 @@
     "object.omit": "^1.1.0",
     "safecb": "0.0.1",
     "simple-bufferstream": "^1.0.0",
-    "tradle-constants": "tradle/tradle-constants",
-    "tradle-utils": "^0.2.1",
+    "@tradle/constants": "*",
+    "@tradle/utils": "^0.2.3",
     "typeforce": "^1.0.0",
     "xtend": "^4.0.0"
   },
   "devDependencies": {
     "datauri": "^0.8.0",
-    "kiki": "^1.1.0",
+    "@tradle/kiki": "^1.1.0",
     "pre-commit": "^1.0.10",
     "readable-stream": "^2.0.0",
     "standard": "^4.3.2",
