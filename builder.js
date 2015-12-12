@@ -37,10 +37,12 @@ Builder.prototype.data = function (json) {
 Builder.prototype.signWith = function (signer, signee) {
   var signFn = typeof signer === 'function' ? signer : signer.sign.bind(signer)
   typeforce('Function', signFn)
-  typeforce('String', signee)
 
   this._signFn = signFn
-  this._data[SIGNEE] = signee
+  if (signee) {
+    this._data[SIGNEE] = signee
+  }
+
   return this
 }
 
