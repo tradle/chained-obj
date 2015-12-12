@@ -2,6 +2,7 @@
 
 var path = require('path')
 var fs = require('fs')
+var Q = require('q')
 var constants = require('@tradle/constants')
 var utils = require('@tradle/utils')
 var ChainedObj = require('./')
@@ -15,10 +16,11 @@ if (!obj[constants.NONCE]) {
 
 Builder()
   .data(obj)
-  .build(function (err, result) {
-    if (err) throw err
-
-    utils.getStorageKeyFor(result.form, function (err, rootHash) {
-      console.log(err || rootHash.toString('hex'))
-    })
+  .build()
+  .then(function (buf) {
+    return Q.ninvoke(utils.getStorageKeyFor, buf)
   })
+  .then(function (rootHash) {
+    console.log(rootHash.toString('hex'))
+  })
+  .done()

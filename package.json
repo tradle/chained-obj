@@ -28,31 +28,18 @@
   },
   "homepage": "https://github.com/tradle/chained-obj",
   "dependencies": {
-    "array-find": "^0.1.1",
-    "buffer-indexof": "0.0.2",
-    "concat-stream": "^1.4.8",
-    "data-uri-to-buffer": "0.0.4",
-    "form-data": "^0.2.0",
-    "formidable": "^1.0.17",
-    "isstream": "^0.1.2",
-    "mime-types": "^2.0.10",
-    "mock-req": "^0.2.0",
-    "object.omit": "^1.1.0",
-    "safecb": "0.0.1",
-    "simple-bufferstream": "^1.0.0",
     "@tradle/constants": "*",
     "@tradle/utils": "^0.2.3",
-    "typeforce": "^1.0.0",
+    "array-find": "^0.1.1",
+    "object.omit": "^1.1.0",
+    "q": "^1.4.1",
+    "typeforce": "^1.6.1",
     "xtend": "^4.0.0"
   },
   "devDependencies": {
-    "datauri": "^0.8.0",
     "@tradle/kiki": "^1.1.0",
     "pre-commit": "^1.0.10",
-    "readable-stream": "^2.0.0",
     "standard": "^4.3.2",
-    "stream-equal": "^0.1.5",
-    "tape": "^4.2.1",
-    "through2": "^2.0.0"
+    "tape": "^4.2.1"
   }
 }

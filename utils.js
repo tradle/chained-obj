@@ -3,9 +3,15 @@ var NONCE = CONSTANTS.NONCE
 var CUR_HASH = CONSTANTS.CUR_HASH
 var ROOT_HASH = CONSTANTS.ROOT_HASH
 var PREV_HASH = CONSTANTS.PREV_HASH
+// var SIG = CONSTANTS.SIG
+// var SIGNEE = CONSTANTS.SIGNEE
 
 module.exports = {
   validate: function (obj) {
+    if (typeof obj === 'string' || Buffer.isBuffer(obj)) {
+      obj = JSON.parse(obj)
+    }
+
     if (!obj[NONCE]) {
       throw new Error('missing message nonce')
     }
@@ -22,5 +28,12 @@ module.exports = {
       }
     }
 
+    // if (obj[SIG] || obj[SIGNEE]) {
+    //   if (!(obj[SIG] && obj[SIGNEE])) {
+    //     throw new Error(
+    //       'signed objects must have both ' + SIG + ' and ' + SIGNEE
+    //     )
+    //   }
+    // }
   }
 }
