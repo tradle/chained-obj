@@ -18,7 +18,7 @@ Builder()
   .data(obj)
   .build()
   .then(function (buf) {
-    return Q.ninvoke(utils.getStorageKeyFor, buf)
+    return Q.ninvoke(utils, 'getStorageKeyFor', buf)
   })
   .then(function (rootHash) {
     console.log(rootHash.toString('hex'))
