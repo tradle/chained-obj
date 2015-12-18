@@ -29,7 +29,7 @@
   "homepage": "https://github.com/tradle/chained-obj",
   "dependencies": {
     "@tradle/constants": "*",
-    "@tradle/utils": "^0.2.3",
+    "@tradle/utils": "^0.3.3",
     "array-find": "^0.1.1",
     "object.omit": "^1.1.0",
     "q": "^1.4.1",
