@@ -8,7 +8,6 @@ var ROOT_HASH = CONSTANTS.ROOT_HASH
 var PREV_HASH = CONSTANTS.PREV_HASH
 var NONCE = CONSTANTS.NONCE
 var SIGNEE = CONSTANTS.SIGNEE
-var BUFFER_ENC = 'binary'
 
 /**
  * multipart form builder with a deterministically generated boundary
@@ -103,15 +102,15 @@ Builder.prototype.build = function (noSign) {
 
 function parseJSON (json) {
   if (typeof json === 'string') return JSON.parse(json)
-  if (Buffer.isBuffer(json)) return JSON.parse(json.toString(BUFFER_ENC))
+  if (Buffer.isBuffer(json)) return JSON.parse(json.toString(utils.BUFFER_ENCODING))
 
   return json
 }
 
 function toBuffer (json) {
   var buf = json
-  if (typeof json === 'string') buf = new Buffer(json, BUFFER_ENC)
-  if (!Buffer.isBuffer(json)) buf = new Buffer(tutils.stringify(json), BUFFER_ENC)
+  if (typeof json === 'string') buf = new Buffer(json, utils.BUFFER_ENCODING)
+  if (!Buffer.isBuffer(json)) buf = new Buffer(tutils.stringify(json), utils.BUFFER_ENCODING)
 
   return buf
 }

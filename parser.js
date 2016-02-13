@@ -22,7 +22,7 @@ Parser.prototype.parse = function (data) {
   assert(typeof data === 'string' || Buffer.isBuffer(data))
 
   try {
-    var result = JSON.parse(data.toString())
+    var result = JSON.parse(data.toString(utils.BUFFER_ENCODING))
   } catch (err) {
     return Q.reject(new Error('invalid json'))
   }

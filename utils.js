@@ -7,6 +7,7 @@ var PREV_HASH = CONSTANTS.PREV_HASH
 // var SIGNEE = CONSTANTS.SIGNEE
 
 module.exports = {
+  BUFFER_ENCODING: 'binary',
   validate: function (obj) {
     if (typeof obj === 'string' || Buffer.isBuffer(obj)) {
       obj = JSON.parse(obj)

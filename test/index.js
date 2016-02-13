@@ -29,6 +29,28 @@ test('build, parse', function (t) {
     .done()
 })
 
+test('fancy chars', function (t) {
+  var data = {
+    blah: '£1'
+  }
+
+  data[NONCE] = '1234'
+  Parser.parse(new Buffer(JSON.stringify(data))).done()
+  Parser.parse(JSON.stringify(data)).done()
+
+  new Builder()
+    .data(data)
+    .build()
+    .then(function (buf) {
+      return Parser.parse(buf)
+    })
+    .then(function (parsed) {
+      t.deepEqual(parsed.data, data)
+      t.end()
+    })
+    .done()
+})
+
 test('sign, hash, build, parse, verify', function (t) {
   var key = Keys.EC.gen({
     purpose: 'sign'
