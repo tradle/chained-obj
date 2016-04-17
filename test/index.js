@@ -31,7 +31,7 @@ test('build, parse', function (t) {
 
 test('fancy chars', function (t) {
   var data = {
-    blah: '£1'
+    blah: '€1'
   }
 
   data[NONCE] = '1234'
